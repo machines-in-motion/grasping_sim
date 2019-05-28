@@ -8,6 +8,7 @@ Reference paper: "Leveraging Contact Forces For Learning to Grasp" [arXiv](https
 
 - "baseline" (Copyright (c) 2017 OpenAi) in src/baselines_catkin/baselines licensed using The MIT License, see related folder for licensing text
 - "catkin" (Copyright (c) 2012 Willow Garage, Inc) in src/catkin/ licensed using the Software License Agreement (BSD License). See related folder for licensing text
+- "Boost python" (Copyright © 2002-2015 David Abrahams, Stefan Seefeld) in src/gazebo_grasping/external/lib/ licensed using the Boost Software License - Version 1.0. See related folder for licensing text
 - Other content (Copyright (c) 2018 Max Planck Gesellschaft) licensed using the BSD 3-Clause Licence
 
 ## Installation
