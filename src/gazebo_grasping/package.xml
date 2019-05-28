@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<package>
+  <name>gazebo_grasping</name>
+  <version>0.0.0</version>
+  <description>The gazebo_grasping package</description>
+
+  <maintainer email="hmerzic@todo.todo">hmerzic</maintainer>
+
+  <license>MIT</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <export>
+  </export>
+</package>

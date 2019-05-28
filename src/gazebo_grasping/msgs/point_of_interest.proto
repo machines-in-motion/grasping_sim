@@ -1,0 +1,9 @@
+package gazebo_grasping.msgs;
+
+import "point3d.proto";
+
+message PointOfInterest
+{
+  required string link_name = 1;
+  repeated Point3d points   = 2;
+}

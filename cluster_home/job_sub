@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+import argparse, subprocess, os, os.path as osp
+
+template = "executable = ./entrypoint.sh\n" \
+    "arguments = python3 SCRIPT -j $(process) -p PREFIX CONFIG\n" \
+    "log = x.log\n" \
+    "request_memory = MEMORY\n" \
+    "request_cpus = CPUS\n" \
+    "requirements = TotalGPUs==0\n" \
+    "universe = docker\n" \
+    "docker_image = docker.is.localnet:5000/hmerzic/IMAGE\n" \
+    "on_exit_remove = (ExitBySignal == False) && (ExitCode == 0)\n" \
+    "MaxTime = 7200\n" \
+    "periodic_hold = (CurrentTime - JobCurrentStartDate) >= $(MaxTime)\n" \
+    "periodic_hold_reason = \"Job runtime exceeded\"\n" \
+    "periodic_hold_subcode = 1\n" \
+    "periodic_release = ( (JobStatus =?= 5) && (HoldReasonCode =?= 3) && (HoldReasonSubCode =?= 1) )\n" \
+    "queue QUEUE"
+
+
+if __name__ == "__main__":
+    pwd = osp.dirname(osp.realpath(__file__))
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('image', type=str, help="Specify the image name.")
+    parser.add_argument('-c', type=str, help="Specify the config file.")
+    parser.add_argument('-s', default="train.py", type=str, help="Specify which script to run.")
+    parser.add_argument('-p', default="", type=str, help="Prefix for saving the logs.")
+    parser.add_argument('--mem', default=4096, type=int, help="RAM in MB allocated for each job.")
+    parser.add_argument('--cpu', default=1, type=int, help="CPUs allocated for each job.")
+    parser.add_argument('-n', default=8, type=int, help="Number of jobs.")
+    parser.add_argument('-j', default=0, type=int, help="Job ID in case n is one.")
+
+    args = parser.parse_args()
+    if args.n <= 0 or (args.n != 1 and not 0 <= args.j < args.n):
+        parser.error("Number of jobs or job specified is invalid.")
+
+    if args.p == "":
+        template = template.replace("-p PREFIX", "")
+    template = template.replace("PREFIX", args.p)
+    template = template.replace("MEMORY", str(args.mem))
+    template = template.replace("CPUS", str(args.cpu))
+    template = template.replace("SCRIPT", args.s)
+    template = template.replace("IMAGE", args.image)
+    template = template.replace("CONFIG", args.c)
+    template = template.replace("QUEUE", str(args.n))
+    if args.n == 1:
+        template = template.replace("$(process)", str(args.j))
+
+    print("Running job:")
+    print(template)
+
+    log_dir = osp.join(pwd, "logs", args.p)
+    if not osp.exists(log_dir):
+        os.makedirs(log_dir)
+
+    jobs_dir = osp.join(pwd, "jobs")
+    if not os.path.exists(jobs_dir):
+        os.makedirs(jobs_dir)
+
+    sub_file = osp.join(jobs_dir, args.p + ".sub")
+    with open(sub_file, 'w') as file:
+        file.write(template)
+
+    process = subprocess.Popen(["condor_submit", sub_file])

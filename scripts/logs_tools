@@ -1,0 +1,333 @@
+#!/usr/bin/env python3
+
+# Copyright (c) 2018 Max Planck Gesellschaft
+# Author : Hamza Meric
+# License : License BSD-3-Clause
+
+
+import argparse, os, os.path as osp, re, sys, subprocess, shutil, pickle
+from itertools import count
+import numpy as np
+import matplotlib.pyplot as plt
+from natsort import natsorted
+from multiprocessing import Pool
+from functools import partial
+
+# keywords = ['EpLenMean', 'EpRewMean', 'TimeElapsed', 'TimestepsSoFar']
+subplot_layouts = {1: [1, 1], 2: [2, 1], 3: [3, 1], 4: [2, 2],
+                   5: [3, 2], 6: [3, 2], 7: [4, 2], 8: [4, 2],
+                   9: [3, 3], 10: [3, 4], 11: [3, 4], 12: [3, 4],
+                   13: [4, 4], 14: [4, 4], 15: [4, 4], 16: [4, 4]}
+
+# ==================== UTILS ====================
+
+
+def running_mean(x, N):
+    N = max(1, min(N, len(x)))
+    cumsum = np.cumsum(np.insert(x, 0, 0))
+    return np.hstack((np.divide(cumsum[1:N], np.linspace(1, N - 1, N - 1)),
+                      (cumsum[N:] - cumsum[:-N]) / N))
+
+
+def mean(array):
+    if len(array) == 0:
+        return np.nan
+    return sum(array) / len(array)
+
+
+def is_dir(abs_path, subdir):
+    return os.path.isdir(os.path.join(abs_path, subdir))
+
+
+def parse_input(msg):
+    yes = set(['yes', 'y', 'ye'])
+    no = set(['no', 'n', ''])
+
+    while True:
+        choice = input("%s (y/N): " % msg).lower()
+        if choice in yes:
+            return True
+        elif choice in no:
+            return False
+        else:
+            print("Please respond with 'yes' or 'no'")
+
+
+def sum_times(arr, n):
+    dur = 0
+    i = len(arr) - 1
+    while i > len(arr) - n:
+        if arr[i] > arr[i - 1]:
+            dur += arr[i] - arr[i - 1]
+        i -= 1
+    return dur
+
+
+def plot_single(ax, key, data, rew):
+    N = 100
+    filtered = running_mean(data[key]['EpRewMean'], N)
+    ax.plot(filtered, linewidth=2.0)
+    ax.set_title("[" + key + "] " + data[key]['Header'].strip()[:48] +
+                 " R(" + str(round(rew, 2)) + ")", fontsize=8)
+    ax.grid(True)
+    ax.autoscale(True, tight=True)
+
+
+def get_data(path, keywords):
+    get_data.pattern = "|".join(['Iteration'] + keywords)
+
+    log_files = [o for o in os.listdir(path) if o.endswith(".out")]
+    assert len(log_files), "No log files found under {}!".format(path)
+
+    data = {}
+    for log_file in log_files:
+        filename = osp.join(path, log_file)
+        data[log_file] = {}
+        with open(filename, 'r') as f:
+            header_found = True
+            while True:
+                line = f.readline()
+                if not line:
+                    print("Header for file {} not found!".format(log_file))
+                    header_found = False
+                    break
+                idx = line.find("HEADER")
+                if idx >= 0:
+                    data[log_file]['Header'] = line[idx + len("HEADER") + 1:]
+                    break
+            if not header_found:
+                data.pop(log_file, None)
+                continue
+
+            for line in f.readlines():
+                m = re.search(get_data.pattern, line)
+                if m:
+                    if m.group(0) not in data[log_file]:
+                        if m.group(0) == 'Iteration':
+                            data[log_file][m.group(0)] = set()
+                        else:
+                            data[log_file][m.group(0)] = []
+                    line_elements = line.split()
+                    if m.group(0) == 'Iteration':
+                        idx = line_elements.index(m.group(0)) + 1
+                        data[log_file]['Iteration'].add(float(line_elements[idx]))
+                    else:
+                        idx = line_elements.index(m.group(0)) + 2
+                        data[log_file][m.group(0)].append(float(line_elements[idx]))
+
+        if 'Iteration' in data[log_file].keys():
+            data[log_file]['Iteration'] = sorted(data[log_file]['Iteration'])
+            numel = len(data[log_file]['Iteration'])
+            for i in range(len(keywords) - 1):
+                assert len(data[log_file][keywords[i]]) == len(data[log_file][keywords[i + 1]])
+            if numel == len(data[log_file][keywords[0]]) + 1:
+                data[log_file]['Iteration'].pop()
+        else:
+            for key in keywords:
+                data[log_file][key] = [np.nan]
+    return data
+
+# ==================== SUMMARIZE ====================
+
+
+def plot_summary_histograms(timesteps_hist, estimated_hist):
+    f, axarr = plt.subplots(2, 1)
+    axarr[0].hist(timesteps_hist)
+    axarr[0].set_title("Simulation timesteps histogram [1]")
+    axarr[1].hist(estimated_hist)
+    axarr[1].set_title("Estimated experiment duration histogram [minutes]")
+    plt.show()
+
+
+def summarize(path, min_rew=5, plot=True, *args, **kwargs):
+    exp_name = osp.basename(path)
+    data = get_data(path, ['EpRewMean', 'TimestepsSoFar', 'TimeElapsed'])
+    timesteps_hist = []
+    estimated_hist = []
+
+    for key in natsorted(data.keys()):
+        backtrack = min(len(data[key]['TimestepsSoFar']), 100)
+        timesteps_hist.append(data[key]['TimestepsSoFar'][-1])
+        if backtrack == 1:
+            continue
+        sim_speed = (data[key]['TimestepsSoFar'][-1] - data[key]['TimestepsSoFar'][-backtrack]) / \
+            sum_times(data[key]['TimeElapsed'], backtrack)
+        estimated_end = (max(2e7 - data[key]['TimestepsSoFar'][-1], 0) / sim_speed) / 60
+
+        estimated_hist.append(estimated_end)
+        last_mean_rew = mean(data[key]['EpRewMean'][-100:])
+        if last_mean_rew >= min_rew:
+            print("{} {} {}".format(last_mean_rew, exp_name, key))
+    if plot:
+        plot_summary_histograms(timesteps_hist, estimated_hist)
+    return (timesteps_hist, estimated_hist)
+
+
+# ==================== PLOT REWARDS ====================
+
+
+def plot_rewards(path, block=True, *args, **kwargs):
+    data = get_data(path, ['EpRewMean'])
+
+    exp_name = osp.basename(path)
+    last_mean_rew = []
+    for key in natsorted(data.keys()):
+        rewards = data[key]['EpRewMean'][-100:]
+        last_mean_rew.append([key, mean(rewards)])
+        if not 'Iteration' in data[key]:
+            continue
+        print(key)
+        print("Number of iterations", data[key]['Iteration'][-1])
+        print("Mean " + str(len(rewards)) + " rewards", last_mean_rew[-1][1])
+        print("Header: " + data[key]['Header'])
+        print("")
+
+    last_mean_rew.sort(key=lambda x: -x[1])
+    n_plots = min(len(last_mean_rew), len(subplot_layouts))
+    layout = subplot_layouts[n_plots]
+    f, axarr = plt.subplots(layout[0], layout[1])
+    if n_plots == 1:
+        f.suptitle("[{}] Result".format(exp_name), fontsize=24)
+        plot_single(axarr, last_mean_rew[0][0], data, last_mean_rew[0][1])
+    else:
+        f.suptitle("[{}] Best {} results".format(exp_name, n_plots), fontsize=24)
+        for i in range(layout[0]):
+            for j in range(layout[1]):
+                if i * layout[1] + j >= len(last_mean_rew):
+                    break
+                if layout[1] == 1:
+                    plot_single(axarr[i], last_mean_rew[i * layout[1] + j][0],
+                                data, last_mean_rew[i * layout[1] + j][1])
+                else:
+                    plot_single(axarr[i, j], last_mean_rew[i * layout[1] + j][0],
+                                data, last_mean_rew[i * layout[1] + j][1])
+    plt.subplots_adjust(hspace=0.3)
+    plt.show(block=block)
+
+# ==================== UNWRAP ====================
+
+
+def unwrap(path, *args, **kwargs):
+    assert os.path.isdir(path), str(path) + " is not a directory."
+
+    # Hardcoded mask.
+    mask = [2, 3, 5, 6, 8, 9, 10, 11, 12, 14, 15, 17, 18]
+    for subdir in [d for d in os.listdir(path) if is_dir(path, d)]:
+        subdir_path = os.path.join(path, subdir)
+
+        for log_folder in [o for o in os.listdir(subdir_path) if is_dir(subdir_path, o)]:
+            old_filename = os.path.join(subdir_path, log_folder + "/gzserver/state.log")
+            if os.path.isfile(old_filename):
+                new_filename = "state" + ''.join([log_folder[i] for i in mask]) + ".log"
+                new_filename = os.path.join(subdir_path, new_filename)
+
+                os.rename(os.path.join(subdir_path, log_folder +
+                                       "/gzserver/state.log"), new_filename)
+                print(log_folder + "/gzserver/state.log   --->   " + new_filename)
+                shutil.rmtree(os.path.join(subdir_path, log_folder))
+            else:
+                print("File %s not found." % old_filename)
+
+# ==================== ANALYZE ====================
+
+
+def analyze(path, *args, **kwargs):
+    assert os.path.isdir(path), str(path) + " is not a directory."
+
+    log_files = natsorted([o for o in os.listdir(path) if o.endswith(".p")])
+    state_files = natsorted([o for o in os.listdir(path) if o.endswith(".log")])
+    assert len(log_files) == len(state_files), "Number of log and state files differs!"
+    assert len(log_files) != 0, "No log files found!"
+    print("State files:")
+    for i, log, state in zip(count(), log_files, state_files):
+        print(i, log, state)
+
+    while True:
+        uin = input("Insert log index (default is %s, q for exit): " % str(len(log_files) - 1))
+        if uin.lower() == 'q':
+            break
+        try:
+            index = int(uin)
+            if index < 0 or index > len(log_files) - 1:
+                print("Index out of range. Using last index instead.")
+                index = len(log_files) - 1
+        except ValueError:
+            index = len(log_files) - 1
+
+        log_file = os.path.join(path, log_files[index])
+        state_file = os.path.join(path, state_files[index])
+
+        data = pickle.load(open(log_file, "rb"))
+        if 'drop_test' in data:
+            print("Drop test result:", data['drop_test'])
+        t = range(1, len(data['r_contacts']) + 1)
+        h_contacts, = plt.plot(t, data['r_contacts'], 'r-', label='contacts')
+        h_obj_dist, = plt.plot(t, data['r_obj_dist'], 'g-', label='obj_rel_dist')
+        h_fing_dist, = plt.plot(t, data['r_fing_dist'], 'b-', label='fing_dist')
+        h_obj_speed, = plt.plot(t, data['r_obj_speed'], 'y-', label='obj_speed')
+        h_torque_reg, = plt.plot(t, data['r_torque_reg'], 'c-', label='torque_reg')
+        plt.legend(handles=[h_contacts, h_obj_dist, h_fing_dist, h_obj_speed, h_torque_reg])
+        plt.grid(True)
+        plt.autoscale(True, tight=True)
+        plt.show(block=False)
+
+        if not parse_input("Replay the simulation"):
+            continue
+
+        args = ["gazebo", "-u", "-p", state_file]
+        proc = subprocess.Popen(args)
+
+        try:
+            os.wait()
+        except KeyboardInterrupt:
+            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+
+
+def main():
+    func_map = {'p': plot_rewards, 's': summarize, 'u': unwrap, 'a': analyze}
+
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('func', choices=['s', 'p', 'u', 'a'],
+                        help="p: plot rewards, s: summarize, u: unwrap, a: analyze")
+    parser.add_argument('-p', default=".", nargs='*', type=str, help="Path of the logs directory.")
+    parser.add_argument('-a', action='store_true', help="Apply to all subdirectories.")
+
+    args = parser.parse_args()
+    function = func_map[args.func]
+
+    if not isinstance(args.p, list):
+        args.p = [args.p]
+
+    for path in args.p:
+        assert osp.isdir(path), str(path) + " is not a directory."
+        if len(args.p) > 1:
+            print(path)
+        path = osp.normpath(osp.join(os.getcwd(), path))
+
+        try:
+            if args.func not in set(['a', 's']) and args.a:
+                for d in natsorted(os.listdir(path)):
+                    if osp.isdir(osp.join(path, d)) and os.fork() == 0:
+                        function(d)
+                        os._exit(0)
+            elif args.func == 's' and args.a:
+                with Pool(processes=16) as pool:
+                    result_list = pool.map(
+                        partial(function, plot=False),
+                        [d for d in natsorted(os.listdir(path)) if osp.isdir(osp.join(path, d))])
+                timesteps_hist = sum([t[0] for t in result_list], [])
+                estimated_hist = sum([t[1] for t in result_list], [])
+                plot_summary_histograms(timesteps_hist, estimated_hist)
+            else:
+                if len(args.p) > 1:
+                    if os.fork() == 0:
+                        function(path)
+                        os._exit(0)
+                else:
+                    function(path)
+        except Exception as exp:
+            print(exp)
+
+
+if __name__ == "__main__":
+    main()

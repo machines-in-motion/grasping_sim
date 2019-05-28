@@ -1,0 +1,12 @@
+package gazebo_grasping.msgs;
+
+import "point_of_interest.proto";
+
+message WorldConfig
+{
+  required double sensor_freq                 = 1;
+  required string contact_type                = 2;
+  repeated PointOfInterest points_of_interest = 3;
+  required double pos_noise                   = 4;
+  required double orient_noise                = 5;
+}

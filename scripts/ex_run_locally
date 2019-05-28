@@ -1,0 +1,36 @@
+#!/bin/bash
+
+# Copyright (c) 2018 Max Planck Gesellschaft
+# Author : Hamza Meric
+# License : License BSD-3-Clause
+
+
+if [ "$#" -ne 2 ]; then
+    echo "Usage: ./ex_run_locally CONFIG PREFIX"
+    exit
+fi
+
+# IMAGE_NAME="docker.is.localnet:5000/hmerzic/graspingv1.6"
+IMAGE_NAME="graspingv1.6"
+CLUSTER_HOME_PATH=$(cd $(dirname $0); pwd -P)/../cluster_home
+STORE_PATH=$CLUSTER_HOME_PATH
+CONFIG="configs/$1"
+PREFIX="local_$2"
+SCRIPT="train.py"
+# Number of jobs to perform.
+QUEUE=8
+CPUS_PER_JOB=1
+MEMORY_PER_JOB=4096
+
+mkdir -p $STORE_PATH/logs/$PREFIX
+for (( id=0; id<$QUEUE; id++ ));
+do
+  docker run \
+    -d \
+    --user=$UID \
+    --cpus=$CPUS_PER_JOB \
+    --memory=${MEMORY_PER_JOB}m \
+    --memory-swap=-1 \
+    -v $STORE_PATH:/home $IMAGE_NAME \
+    /bin/bash -c "cd /home; ./entrypoint.sh python3 $SCRIPT -j $id -p $PREFIX $CONFIG"
+done

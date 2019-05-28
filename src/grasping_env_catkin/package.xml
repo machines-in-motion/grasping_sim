@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<package>
+  <name>grasping_env</name>
+  <version>1.0.0</version>
+  <description>Python package that wraps Grasping Environment.</description>
+  <maintainer email="hamzamerzic@gmail.com">Hamza Merzic</maintainer>
+  <license>MPI</license>
+  <author email="hamzamerzic@gmail.com">Hamza Merzic</author>
+  <buildtool_depend>catkin</buildtool_depend>
+</package>

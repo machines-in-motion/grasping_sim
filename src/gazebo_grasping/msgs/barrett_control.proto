@@ -1,0 +1,10 @@
+package gazebo_grasping.msgs;
+
+message BarrettControl
+{
+  required double spread = 1;
+  required double joint1 = 2;
+  required double joint2 = 3;
+  required double joint3 = 4;
+  repeated double twist  = 5;
+}

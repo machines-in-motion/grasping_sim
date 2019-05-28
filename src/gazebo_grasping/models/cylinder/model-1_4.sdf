@@ -1,0 +1,51 @@
+<?xml version='1.0'?>
+<sdf version='1.4'>
+  <model name='object'>
+    <pose frame=''>0 0 0 0 0 0</pose>
+    <link name='link'>
+      <inertial>
+        <mass>1</mass>
+        <inertia>
+          <ixx>0.083958</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.083958</iyy>
+          <iyz>0</iyz>
+          <izz>0.00125</izz>
+        </inertia>
+      </inertial>
+      <collision name='c_cyl'>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://cylinder/mesh/cylinder.dae</uri>
+          </mesh>
+        </geometry>
+        <surface>
+          <contact>
+            <ode>
+              <kp>1000000</kp>
+              <kd>100</kd>
+              <max_vel>1000.0</max_vel>
+              <min_depth>0.0</min_depth>
+            </ode>
+          </contact>
+        </surface>
+      </collision>
+      <visual name='v_cyl'>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://cylinder/mesh/cylinder.dae</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/GreyTransparent</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>

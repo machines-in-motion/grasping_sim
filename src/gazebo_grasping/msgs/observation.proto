@@ -1,0 +1,11 @@
+package gazebo_grasping.msgs;
+
+message Observation
+{
+  repeated double contacts      = 1;
+  repeated double hand_dof      = 2;
+  repeated double obj_rel_pose  = 3;
+  repeated double obj_rel_twist = 4;
+  required double obj_speed     = 5;
+  repeated double sdf_points    = 6;
+}

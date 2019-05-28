@@ -1,0 +1,54 @@
+<?xml version="1.0"?>
+<sdf version='1.6'>
+  <world name='reacher'>
+    <gravity>0 0 -9.8</gravity>
+    <physics type="ode">
+      <max_contacts>40</max_contacts>
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>0.0</real_time_factor>
+      <ode>
+        <solver>
+          <type>quick</type>
+          <iters>40</iters>
+          <sor>1.2</sor>
+        </solver>
+        <constraints>
+          <cfm>0</cfm>
+          <erp>0.2</erp>
+          <contact_max_correcting_vel>1000</contact_max_correcting_vel>
+          <contact_surface_layer>0.0</contact_surface_layer>
+        </constraints>
+      </ode>
+    </physics>
+
+    <include>
+      <uri>model://sun</uri>
+    </include>
+
+    <include>
+      <uri>model://barrett</uri>
+      <pose>-0 0 0 0 1.57079632679 0</pose>
+    </include>
+
+    <model name ='object'>
+      <pose>0.0 0.0 2.0 0.0 0.0 0.0</pose>
+      <link name='link'>
+        <visual name='visual'>
+          <geometry>
+            <sphere>
+              <radius>0.05</radius>
+            </sphere>
+          </geometry>
+          <material>
+            <script>
+              <name>Gazebo/Red</name>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+            </script>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <plugin name="world_plugin" filename="libworld_plugin.so"/>
+  </world>
+</sdf>

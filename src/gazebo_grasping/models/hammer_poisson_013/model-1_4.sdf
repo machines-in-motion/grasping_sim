@@ -1,0 +1,57 @@
+<?xml version='1.0'?>
+<sdf version='1.4'>
+  <model name="object">
+    <link name='link'>
+      <pose>0.0 0 0 0 0 0</pose>
+      <inertial>
+        <mass>3</mass>
+        <inertia>
+          <ixx>0.00768644051</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.00202292875</iyy>
+          <iyz>0</iyz>
+          <izz>0.00901894778</izz>
+        </inertia>
+      </inertial>
+      <collision name='c_bp_022'>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://hammer_poisson_013/mesh/hammer_poisson_013.dae</uri>
+          </mesh>
+        </geometry>
+        <surface>
+          <contact>
+            <ode>
+              <kp>1000000</kp>
+              <kd>100</kd>
+              <max_vel>1000.0</max_vel>
+              <min_depth>0.0</min_depth>
+            </ode>
+          </contact>
+        </surface>
+      </collision>
+
+      <visual name='v_bp_022'>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>model://hammer_poisson_013/mesh/hammer_poisson_013.dae</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <script>
+            <name>Gazebo/GreyTransparent</name>
+            <uri>file://media/materials/scripts/gazebo.material</uri>
+          </script>
+        </material>
+      </visual>
+
+      <velocity_decay>
+        <linear>0.0004</linear>
+        <angular>0.0004</angular>
+      </velocity_decay>
+    </link>
+  </model>
+</sdf>

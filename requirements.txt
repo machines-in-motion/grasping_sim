@@ -1,0 +1,8 @@
+gym
+catkin_pkg
+catkin_tools
+trollius
+empy
+mpi4py
+tensorflow
+scipy

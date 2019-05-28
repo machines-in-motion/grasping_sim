@@ -1,0 +1,8 @@
+package gazebo_grasping.msgs;
+
+message Point3d
+{
+  optional double x = 1;
+  optional double y = 2;
+  optional double z = 3;
+}

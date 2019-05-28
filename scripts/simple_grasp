@@ -1,0 +1,57 @@
+#!/usr/bin/env python3
+
+# Copyright (c) 2018 Max Planck Gesellschaft
+# Author : Hamza Meric
+# License : License BSD-3-Clause
+
+
+import argparse, sys, os, os.path as osp, time
+import numpy as np
+
+from grasping_env import GraspingEnv, load_config, make_from_config
+
+SIMPLE_AC = np.array([-0.2, 0.7, 0.7, 1.4])
+
+def main():
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('-n', default="50", type=int, help="Number of pre-grasps to go through.")
+    parser.add_argument('-s', default="0", type=int, help="Starting pre-grasp id.")
+    parser.add_argument('-p', default=".", type=str, help="Path of the config file.")
+    args = parser.parse_args()
+
+    # If config exists, load it from yaml file.
+    assert osp.isfile(osp.join(args.p, "config.yaml")), "Config not found!"
+    config = load_config(osp.join(args.p, "config.yaml"))
+    env = make_from_config(config)
+
+    assert str(env) == "GraspingEnvPregrasps", "Env is not of the type GraspingEnvPregrasps!"
+
+    def actor(obs):
+        return SIMPLE_AC
+    env.render()
+    if hasattr(env, "set_actor"):
+        env.set_actor(actor)
+
+    try:
+        for idx in range(args.s, args.s + args.n):
+            print("{}: ".format(idx))
+            pregrasps = env.obj_pregrasps[env.object]
+            env.custom_pregrasp = pregrasps[idx]
+            print("Pregrasps physics score: {}".format(env.obj_phys_scores[env.object][idx]))
+            obs = env.reset()
+            done = False
+            rewards = []
+            start = time.time()
+            while not done:
+                obs, reward, done, _ = env.step(SIMPLE_AC)
+                rewards.append(reward)
+            print("Duration: {}".format(time.time() - start))
+            print("Reward:        {}".format(sum(rewards)))
+    except Exception as err:
+        print(err)
+        pass
+    env.close()
+
+
+if __name__ == "__main__":
+    main()

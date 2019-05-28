@@ -1,0 +1,62 @@
+# Note: make sure scientific notation has decimal places and + is specified.
+# E.g. 1.0e+8 works, but 1e+8 and 1.0e8 do not work.
+type: "trpo"
+world: "pregrasps"      # Possible: "empty", "pregrasps" and "cylinder".
+seed: -1
+num_cpu: 1
+log_every: 4000
+log_dir:
+num_timesteps: 1.5e+7
+timesteps_per_batch: 2048
+hyperparams: ["max_kl"]
+
+# Environment common.
+episode_len: 1000
+sensor_freq: 100.0      # In Hz.
+warm_init_eps: 0        # Number of simple policy initialization episodes.
+contact_type: "mean"    # Possible: "standard", "mean", "max", "torque" and "none".
+binary_cont_rew: True   # Reward from contacts is either binary or continuous.
+k_cont: 0.4             # Weight of the reward from contacts. [divide by 20 for continuous]
+k_obj_dist: 2.0         # Weight penalizing distance to object.
+k_obj_vel: 2.0          # Weight penalizing object velocity.
+k_mean_poi: 1.0         # Weight penalizing the mean of SDF distances of pois.
+k_torque_reg: 6.0e-4    # Regularization factor for the input torque.
+# Default are fingertips for each distal link specified in their frame
+points_of_interest: {"finger_1_dist_link": [[0.05, 0.004, 0.0]],
+                     "finger_2_dist_link": [[0.05, 0.004, 0.0]],
+                     "finger_3_dist_link": [[0.05, 0.004, 0.0]]}
+cont_in_state: True
+dof_in_state: True
+obj_pose_in_state: True
+obj_twist_in_state: True
+obj_speed_in_state: False
+pois_in_state: False
+time_in_state: False
+max_hand_lin_vel: 0.0  # Limit controlling hand's linear velocity.
+max_hand_ang_vel: 0.0  # Limit controlling hand's angular velocity.
+pos_noise: 0.0
+orient_noise: 0.0
+
+# Environment specific.
+objects: ["bottle_poisson_009"]
+max_obj_dist: 0.5
+leave_bound_rew: -1.0
+drop_test_rew: 10.0
+min_phys_score: 0        # Use grasps above certain score. 0 >= score => all.
+max_phys_score: 1        # Use grasps below certain score. score >= 1 => all.
+same_grasp_prob: -1      # Probability to sample the same grasp again.
+
+# Policy specific.
+gaussian_fixed_var: False
+use_obfilter: False
+hid_sizes: [300, 200, 100]
+
+# Algorithm constants.
+cg_iters: 10
+cg_damping: 0.1
+vf_iters: 5
+vf_stepsize: 1.0e-3
+entcoeff: 0.0
+gamma: 0.999
+lam: 1.0
+max_kl: [0.01, 0.025]

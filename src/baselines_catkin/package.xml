@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<package>
+  <name>baselines</name>
+  <version>1.0.0</version>
+  <description>Python package that wraps OpenAI's baselines.</description>
+  <maintainer email="hamzamerzic@gmail.com">Hamza Merzic</maintainer>
+  <license>MPI</license>
+  <author email="hamzamerzic@gmail.com">Hamza Merzic</author>
+  <buildtool_depend>catkin</buildtool_depend>
+</package>

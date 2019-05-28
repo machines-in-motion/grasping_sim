@@ -1,0 +1,143 @@
+#!/usr/bin/env python3
+
+# Copyright (c) 2018 Max Planck Gesellschaft
+# Author : Hamza Meric
+# License : License BSD-3-Clause
+
+
+import argparse, sys, os, os.path as osp, time
+import numpy as np
+import matplotlib.pyplot as plt
+from baselines.common import tf_util as U
+import tensorflow as tf
+from natsort import natsorted
+from collections import defaultdict
+
+from grasping_env import GraspingEnv, load_config, make_from_config
+
+
+def fix_checkpoint_file(policy_path):
+    file_path = osp.join(policy_path, "checkpoint")
+    assert osp.isfile(file_path), "Checkpoint file missing!"
+
+    with open(file_path, 'r') as chck_file:
+        lines = chck_file.readlines()
+
+    with open(file_path, 'w') as chck_file:
+        for line in lines:
+            if '"' not in line:
+                chck_file.write(line)
+                continue
+            else:
+                l_idx, r_idx = line.index('"') + 1, line.rindex('"') - 1
+                path = line[l_idx:r_idx + 1]
+                new_path = osp.normpath(osp.join(policy_path, osp.basename(path)))
+                new_line = line.replace(path, new_path)
+                chck_file.write(new_line)
+
+
+def parse_input(msg):
+    yes = set(['yes', 'y', 'ye', ''])
+    no = set(['no', 'n', 'q'])
+
+    while True:
+        choice = input("%s (Y/n): " % msg).lower()
+        if choice in yes:
+            return True
+        elif choice in no:
+            return False
+        else:
+            print("Please respond with 'y' or 'n'")
+
+
+def parse_input_int(msg, max_num):
+    while True:
+        choice = input("{} (max: {}): ".format(msg, max_num))
+        try:
+            if choice.lower() == 'q':
+                return -1
+            elif 0 <= int(choice) < max_num:
+                return int(choice)
+        except:
+            pass
+        print("Wrong input!")
+
+
+def plot_log(data):
+    t = range(1, len(data['r_contacts']) + 1)
+    h_contacts, = plt.plot(t, data['r_contacts'], 'r-', label='contacts')
+    h_obj_dist, = plt.plot(t, data['r_obj_dist'], 'g-', label='obj_rel_dist')
+    h_fing_dist, = plt.plot(t, data['r_fing_dist'], 'b-', label='fing_dist')
+    h_obj_speed, = plt.plot(t, data['r_obj_speed'], 'y-', label='obj_speed')
+    h_torque_reg, = plt.plot(t, data['r_torque_reg'], 'c-', label='torque_reg')
+    plt.legend(handles=[h_contacts, h_obj_dist, h_fing_dist, h_obj_speed, h_torque_reg])
+    plt.grid(True)
+    plt.autoscale(True, tight=True)
+    plt.show(block=False)
+
+
+def main(policy_path):
+    fix_checkpoint_file(policy_path)
+    sess = U.make_session(num_cpu=1)
+    sess.__enter__()
+
+    # If config exists, load it from yaml file.
+    if osp.isfile(osp.join(policy_path, "config.yaml")):
+        config = load_config(osp.join(policy_path, "config.yaml"))
+        env = make_from_config(config)
+    else:
+        env = GraspingEnv()
+    env.log = defaultdict(list)
+
+    meta_files = natsorted([file for file in os.listdir(policy_path) if file.endswith(".meta")])
+    model_meta_path = osp.join(policy_path, meta_files[-1])
+    loader = tf.train.import_meta_graph(model_meta_path)
+    loader.restore(sess, tf.train.latest_checkpoint(policy_path))
+    pi = tf.get_default_graph().get_tensor_by_name("pi/pi:0")
+    ob = tf.get_default_graph().get_tensor_by_name("pi/ob:0")
+    grad = tf.abs(tf.gradients(pi, [ob])[0])
+
+    pi = sess.make_callable(pi, feed_list=[ob, 'pi/stoch:0'])
+    grad = sess.make_callable(grad, feed_list=[ob, 'pi/stoch:0'])
+    def actor(obs):
+        return pi(obs[None], False)[0]
+    env.render()
+    if hasattr(env, "set_actor"):
+        env.set_actor(actor)
+
+    try:
+        while True:
+            if str(env) == "GraspingEnvPregrasps":
+                pregrasps = env.obj_pregrasps[env.object]
+                idx = parse_input_int("Insert pre-grasp index", len(pregrasps))
+                if idx == -1:
+                    break
+                env.custom_pregrasp = pregrasps[idx]
+                print("Pregrasps physics score: {}".format(env.obj_phys_scores[env.object][idx]))
+            elif not parse_input("Perform a rollout "):
+                break
+            obs = env.reset()
+            env.logging = True
+            done = False
+            rewards = []
+            start = time.time()
+            while not done:
+                obs, reward, done, _ = env.step(actor(obs))
+                rewards.append(reward)
+            print("Duration: {}".format(time.time() - start))
+            print("Reward:        {}".format(sum(rewards)))
+            env.logging = False
+            plot_log(env.log)
+            env.log.clear()
+    except Exception as err:
+        print(err)
+        pass
+    env.close()
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('policy_path', nargs='?', default='.', type=str,
+                        help="Path of the policy network graph.")
+    args = parser.parse_args()
+    main(args.policy_path)

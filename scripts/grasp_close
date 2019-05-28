@@ -1,0 +1,67 @@
+#!/usr/bin/env python3
+
+# Copyright (c) 2018 Max Planck Gesellschaft
+# Author : Hamza Meric
+# License : License BSD-3-Clause
+
+import sys
+import numpy as np
+import matplotlib.pyplot as plt
+
+from grasping_env import GraspingEnv
+
+
+def parse_input(num_pregrasps):
+    while True:
+        choice = input("Insert pre-grasp index in the range [0, {}): ".format(num_pregrasps))
+        try:
+            if choice == "q":
+                sys.exit(0)
+            if 0 <= int(choice) < num_pregrasps:
+                return int(choice)
+        except ValueError:
+            pass
+        print("Wrong input!")
+
+ACTION = np.array([0.0, 0.2, 0.2, 0.2])
+
+
+def main():
+    env = GraspingEnv(max_steps=1000)
+    pregrasps = env.obj_pregrasps[env.object]
+    scores = env.obj_scores[env.object]
+
+    num_pregrasps = len(pregrasps)
+    print("Total number of pregrasps: {}".format(num_pregrasps))
+    while True:
+        i = parse_input(num_pregrasps)
+        env.custom_pregrasp = pregrasps[i]
+        obs = env.reset()
+        # no_action = False
+
+        print("{0:5d} score: {1}".format(i, scores[i]))
+
+        done = False
+        rewards = []
+        input("Press enter to start!")
+        while not done:
+            # if np.linalg.norm(obs[0:27]) > 1e-3:
+            #     no_action = True
+            # if no_action:
+            #     action = np.zeros(4)
+            # else:
+            #     action = ACTION
+            # obs, r, done, _ = env.step(action)
+            obs, r, done, _ = env.step(ACTION)
+            rewards.append(r)
+
+        if len(rewards) == env.spec.max_episode_steps + 1:
+            print("Drop test result: %f." % rewards.pop())
+
+        plt.plot(rewards)
+        plt.autoscale(True, tight=True)
+        plt.show()
+        env.reset()
+
+if __name__ == "__main__":
+    main()

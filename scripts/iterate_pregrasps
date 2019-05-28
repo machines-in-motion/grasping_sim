@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+
+# Copyright (c) 2018 Max Planck Gesellschaft
+# Author : Hamza Meric
+# License : License BSD-3-Clause
+
+
+
+import sys
+import numpy as np
+import matplotlib.pyplot as plt
+
+from grasping_env import GraspingEnv
+
+
+def parse_input(msg):
+    yes = set(['yes', 'y', 'ye'])
+    no = set(['no', 'n', ''])
+    q = set(['q'])
+
+    while True:
+        choice = input("%s (y/N): " % msg).lower()
+        if choice in yes:
+            return True
+        elif choice in no:
+            return False
+        elif choice in q:
+            sys.exit(0)
+        else:
+            print("Please respond with 'yes' or 'no'")
+
+
+def policy(obs):
+    f1_contact = any(map(lambda x: abs(x) > 1e-5, obs[3:12]))
+    f2_contact = any(map(lambda x: abs(x) > 1e-5, obs[12:21]))
+    f3_contact = any(map(lambda x: abs(x) > 1e-5, obs[21:27]))
+    res = np.array([0.0, 0.2, 0.2, 0.4])
+    if f1_contact and f2_contact and f3_contact:
+        return res
+    if f1_contact:
+        res[1] = 0.0
+    if f2_contact:
+        res[2] = 0.0
+    if f3_contact:
+        res[3] = 0.0
+    return res
+
+
+def main():
+    env = GraspingEnv()
+    pregrasps = env.obj_pregrasps[env.object]
+    scores = env.obj_scores[env.object]
+
+    num_pregrasps = len(pregrasps)
+    print("Total number of pregrasps: {}".format(num_pregrasps))
+    for i in range(num_pregrasps):
+        env.custom_pregrasp = pregrasps[i]
+        env.reset()
+
+        print("{0:5d} score: {1}".format(i, scores[i]))
+        if parse_input("Run simple policy"):
+            action = np.array([0.0, 0.2, 0.2, 0.2])
+            done = False
+            rewards = []
+            while not done:
+                obs, r, done, _ = env.step(action)
+                rewards.append(r)
+                action = policy(obs)
+
+            if len(rewards) == env.spec.max_episode_steps + 1:
+                print("Drop test result: %f." % rewards.pop())
+
+            plt.plot(rewards)
+            plt.autoscale(True, tight=True)
+            plt.show()
+            env.reset()
+
+
+if __name__ == "__main__":
+    main()
