@@ -1,8 +1,24 @@
 # Grasping Learning Environment
 
-Grasping learning environment is a learning environment which simulates grasping tasks in Gazebo. The environment is written as a Python module with the same interface as the environments used in OpenAI's Gym.
+Grasping learning environment simulates grasping tasks in Gazebo. The environment is written as a Python module with the same interface as the environments used in OpenAI's Gym.
 
-Reference paper: "Leveraging Contact Forces For Learning to Grasp" [arXiv](https://arxiv.org/abs/1809.07004)
+## How to cite
+
+For details check out the paper "Leveraging Contact Forces For Learning to Grasp" on [arXiv](https://arxiv.org/abs/1809.07004).
+
+```
+@inproceedings{2019_ICRA_mbkrb,
+  author    = {Hamza Merzic and
+               Miroslav Bogdanovic and
+               Daniel Kappler and
+               Ludovic Righetti and
+               Jeannette Bohg},
+  title     = {Leveraging Contact Forces for Learning to Grasp},
+  booktitle = {2019 IEEE International Conference on Robotics and Automation},
+  year      = {2019},
+  url       = {http://arxiv.org/abs/1809.07004}
+}
+```
 
 ## License
 
